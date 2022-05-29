@@ -1,0 +1,16 @@
+-
+    name: 'Use lineinfile module'
+    hosts: all
+    vars:
+        var1: Test
+    tasks:
+        -
+            name: 'Copy the source file first'
+            copy:
+                src: empty_file.txt
+                dest: target.txt
+        -
+            name: Replace a line in a file
+            lineinfile:
+                path: target.txt
+                line: '{{ var1 }}'

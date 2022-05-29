@@ -1,0 +1,12 @@
+target1 ansible_connection=ssh ansible_host=192.168.1.30 ansible_user=root ansible_ssh_pass=osboxes.org
+target2 ansible_connection=ssh ansible_host=192.168.1.32 ansible_user=root ansible_ssh_pass=osboxes.org
+
+[web_nodes]
+target1
+
+[db_nodes]
+target2
+
+[all_nodes:children]
+web_nodes
+db_nodes

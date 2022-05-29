@@ -1,0 +1,8 @@
+-
+  name: Copy file to target servers
+  hosts: all
+  tasks:
+    - name: Copy file
+      copy:
+        src: /usr/local/var/www/html/learn-ansible/exercise-1-copy-file/test-file.txt
+        dest: /tmp/test-file.txt

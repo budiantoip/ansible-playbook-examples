@@ -1,0 +1,10 @@
+-
+    name: 'Execute a command to display hosts file on all servers using 2 same approaches'
+    hosts: all
+    tasks:
+        -
+            name: Execute a command to display hosts file - approach 1
+            command: cat /etc/hosts
+        -
+            name: Execute a command to display hosts file - approach 2
+            command: cat hosts chdir=/etc

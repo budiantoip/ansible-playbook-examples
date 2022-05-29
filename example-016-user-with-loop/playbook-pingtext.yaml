@@ -1,0 +1,41 @@
+-
+    name: 'Users in loop'
+    hosts: all
+    tasks:
+        -
+            name: View config files
+            debug: var=item
+            with_file:
+                - "/etc/hosts"
+                - "/etc/resolv.conf"
+        -
+            name: Get from multiple URLs
+            debug: msg="{{item}}"
+            with_url:
+                - 'https://github.com/gremlin.keys'
+        -
+            name: Create users
+            user:
+                name: "{{ item.name }}"
+                uid: "{{ item.uid }}"
+                state: present
+            with_items:
+                - name: joe1
+                  uid: 1010
+                - name: joe2
+                  uid: 1011
+                - name: joe3
+                  uid: 1012
+        -
+            name: Delete all created users
+            user:
+                name: "{{ item.name }}"
+                state: absent
+                remove: yes
+            with_items:
+                - name: joe1
+                  uid: 1010
+                - name: joe2
+                  uid: 1011
+                - name: joe3
+                  uid: 1012

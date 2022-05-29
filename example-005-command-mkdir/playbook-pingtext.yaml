@@ -1,0 +1,7 @@
+-
+    name: 'Execute date command on all servers'
+    hosts: all
+    tasks:
+        -
+            name: 'Create a folder'
+            command: mkdir /tmp/folder creates=/tmp/folder

@@ -1,0 +1,13 @@
+-
+    name: 'Check status of a service and email if it is down'
+    hosts: all
+    tasks:
+        -
+            command: service firewalld status
+            register: result
+        -
+            mail:
+                to: budiantoip@gmail.com
+                subject: Service Alert
+                body: firewalld service is down
+            when: result.stdout.find('down') != -1

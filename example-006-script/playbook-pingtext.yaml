@@ -1,0 +1,7 @@
+-
+    name: 'Runs a script on remote servers'
+    hosts: all
+    tasks:
+        -
+            name: 'Runs a script on remote servers'
+            script: script.sh

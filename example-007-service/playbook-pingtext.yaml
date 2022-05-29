@@ -1,0 +1,19 @@
+-
+    name: 'Start services in order'
+    hosts: all
+    tasks:
+        -
+            name: 'Start the database service'
+            service:
+                name: mysql
+                state: started
+        -
+            name: Start the httpd service
+            service:
+                name: httpd
+                state: started
+        -
+            name: Start the nginx service
+            service:
+                name: nginx
+                state: started

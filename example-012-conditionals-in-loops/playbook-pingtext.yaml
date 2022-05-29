@@ -1,0 +1,31 @@
+-
+    name: 'Install Softwares'
+    hosts: all
+    vars:
+        packages:
+            - name: nginx
+              required: True
+            - name: mysql
+              required: True
+            - name: apache
+              required: True
+    tasks:
+        -
+            name: 'Install "{{ item.name }}" on Debian'
+            apt:
+                name: "{{ item.name }}"
+                state: present
+            when: item.required == True and
+                  ansible_os_family == "Debian" and
+                  ansible_distribution_version == "16.04"
+            loop: "{{ packages }}"
+        -
+            name: 'Install "{{ item.name }}" on Redhat'
+            yum:
+                name: "{{ item.name }}"
+                state: present
+            when: item.required == True and
+                  (ansible_os_family == "Redhat" or
+                  ansible_os_family == "SUSE") and
+                  ansible_distribution_version == "16.04"
+            loop: "{{ packages }}"

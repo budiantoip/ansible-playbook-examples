@@ -1,0 +1,26 @@
+-
+    name: 'Users in loop'
+    hosts: all
+    vars:
+        users:
+            - name: joe1
+              uid: 1010
+            - name: joe2
+              uid: 1011
+            - name: joe3
+              uid: 1012
+    tasks:
+        -
+            name: Create users
+            user:
+                name: "{{ item.name }}"
+                uid: "{{ item.uid }}"
+                state: present
+            loop: "{{ users }}"
+        -
+            name: Delete all created users
+            user:
+                name: "{{ item.name }}"
+                state: absent
+                remove: yes
+            loop: "{{ users }}"
