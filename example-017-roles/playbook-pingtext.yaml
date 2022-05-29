@@ -1,0 +1,10 @@
+-
+    name: Install and Configure MySQL
+    hosts: target1
+    roles:
+      - mysql
+-
+    name: Install and Configure Web Server
+    hosts: target2
+    roles:
+      - nginx

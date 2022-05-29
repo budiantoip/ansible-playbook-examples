@@ -1,0 +1,13 @@
+-
+    name: Install and Configure MySQL
+    hosts: target1
+    roles:
+      - role: geerlingguy.mysql
+        become: yes
+        vars:
+          mysql_user_name: db-user
+-
+    name: Install and Configure Web Server
+    hosts: target2
+    roles:
+      - role: nginx
