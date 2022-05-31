@@ -1,0 +1,184 @@
+-
+  name: Install and start firewall service on CentOS
+  hosts: target3
+  tasks:
+    - 
+      name: Install firewalld
+      yum:
+        name: firewalld
+        state: present
+    -
+      name: Start the firewalld service
+      service:
+        name: firewalld
+        state: started
+    -
+      name: Enable firewalld service
+      systemd:
+        name: firewalld
+        enabled: yes
+
+-
+  name: Install, configure, and start MariaDB on CentOS
+  hosts: target3
+  tasks:
+    -
+      name: Install MariaDB
+      yum:
+        name: mariadb-server
+        state: present
+    -
+      name: Configure MariaDB
+      lineinfile:
+        path: /etc/my.cnf
+        line: "port = 3306"
+    -
+      name: Start the MariaDB service
+      service:
+        name: mariadb
+        state: started
+    -
+      name: Enable MariaDB
+      systemd:
+        name: mariadb
+        enabled: yes
+    - 
+      name: Add port 3306 into the firewalld configuration
+      command: firewall-cmd --permanent --zone=public --add-port=3306/tcp
+    -
+      name: Reload the firewalld config
+      command: firewall-cmd --reload
+    - name: Install PyMySQL, since it is required by the mysql_db and mysql_user modules to work properly
+      yum:
+        name: python2-PyMySQL
+        state: present
+    -
+      name: Create new database in MariaDB
+      mysql_db:
+        name: wpdb
+        state: present
+        login_user: root
+    - 
+      name: Create new user
+      mysql_user:
+        login_user: root
+        name: wpuser
+        host: localhost
+        password: wppassword
+        state: present
+        priv: "wpdb.*:ALL"
+-
+  name: Install, configure, and start Apache and PHP on CentOS
+  hosts: target3
+  tasks:
+    -
+      name: Install yum utils
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - epel-release
+        - yum-utils
+    -
+      name: Enable remi repository and install PHP 7.4
+      command: "{{ item }}"
+      loop:
+        - "yum install -y epel-release yum-utils"
+        - "yum install -y http://rpms.remirepo.net/enterprise/remi-release-7.rpm"
+        - "yum-config-manager --enable remi-php74"
+        - "yum install -y php php-cli php-fpm php-mysqlnd php-zip php-devel php-gd php-mcrypt php-mbstring php-curl php-xml php-pear php-bcmath php-json"
+    -
+      name: Install Apache and PHP
+      yum:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - httpd
+        - php
+        - php-mysql
+    -
+      name: Configure firewall to allow incoming request on port 80/tcp
+      command: firewall-cmd --permanent --zone=public --add-port=80/tcp
+    -
+      name: Reload the firewalld config
+      command: firewall-cmd --reload
+    -
+      name: Configure Apache
+      lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "index.html"
+        line: "    DirectoryIndex index.php"
+    -
+      name: Start the Apache service
+      service:
+        name: httpd
+        state: started
+    -
+      name: Enable Apache
+      systemd:
+        name: httpd
+        enabled: yes
+
+-
+  name: Download and configure the web application
+  hosts: target3
+  tasks:
+    -
+      name: Install git
+      yum:
+        name: git
+        state: present
+    -
+      name: Download code from github
+      git:
+        repo: https://github.com/WordPress/WordPress
+        dest: /var/www/html
+    -
+      name: Copy the WP config sample file
+      copy:
+        remote_src: true
+        src: /var/www/html/wp-config-sample.php
+        dest: /var/www/html/wp-config.php
+    -
+      name: Modify the database configuration in the code
+      lineinfile:
+        path: /var/www/html/wp-config.php
+        search_string: "{{ item.find }}"
+        line: "{{ item.replace }}"
+      with_items:
+        - { find: "define( 'DB_NAME', 'database_name_here' );", replace: "define( 'DB_NAME', 'wpdb' );"}
+        - { find: "define( 'DB_USER', 'username_here' );", replace: "define( 'DB_USER', 'wpuser' );" }
+        - { find: "define( 'DB_PASSWORD', 'password_here' );", replace: "define( 'DB_PASSWORD', 'wppassword' );" }
+    -
+      name: Remove the existing authentication unique keys and salts
+      lineinfile:
+        path: /var/www/html/wp-config.php
+        regexp: "'{{ item }}'"
+        line: ""
+      loop:
+       - AUTH_KEY
+       - SECURE_AUTH_KEY
+       - LOGGED_IN_KEY
+       - NONCE_KEY
+       - AUTH_SALT
+       - SECURE_AUTH_SALT
+       - LOGGED_IN_SALT
+       - NONCE_SALT
+    -
+      name: Retrieve the new unique keys and salts
+      uri:
+        url: https://api.wordpress.org/secret-key/1.1/salt/
+        method: GET
+        return_content: yes
+        body_format: raw
+      register: keys_and_salts
+    -
+      name: Display the keys_and_salts.content value to make sure it is correct
+      debug:
+        var: keys_and_salts.content
+    -
+      name: Put the retrieved keys and salts back into the WP config file
+      blockinfile:
+        path: /var/www/html/wp-config.php
+        block: |
+          {{ keys_and_salts.content }}
