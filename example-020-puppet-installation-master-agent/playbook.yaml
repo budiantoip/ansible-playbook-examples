@@ -1,0 +1,207 @@
+# references:
+# - https://www.itzgeek.com/post/how-to-install-puppet-on-centos-8-rhel-8/
+# - https://www.itzgeek.com/post/how-to-install-ntp-chrony-on-centos-8-centos-7-rhel-8-rhel-7/#configure-ntp-client-using-chrony
+
+-
+  name: Install Puppet repository
+  hosts: all
+  tasks:
+    -
+      name: update packages
+      command: sudo yum update -y
+      ignore_errors: false
+    -
+      name: install puppet repository
+      command: sudo rpm -Uvh http://yum.puppetlabs.com/puppet-release-el-7.noarch.rpm
+      ignore_errors: false
+-
+  name: Install and configure Puppet Master on standalone VM
+  hosts: master
+  tasks:
+    - 
+      name: Install Puppet master
+      yum:
+        name: puppetserver
+        state: present
+    -
+      name: Configure NTP
+      lineinfile:
+        path: /etc/chrony.conf
+        search_string: allow 192
+        line: allow 192.168.1.0/24
+    -
+      name: Restart chrony service
+      service:
+        name: chronyd
+        state: restarted
+    -
+      name: Change the value of memory allocation
+      lineinfile:
+        path: /etc/sysconfig/puppetserver
+        search_string: JAVA_ARGS=
+        line: JAVA_ARGS="-Xms512m -Xmx512m -Djruby.logger.class=com.puppetlabs.jruby_utils.jruby.Slf4jLogger"
+    -
+      name: Set the FQDN
+      command: hostnamectl set-hostname master.puppet.dev
+    -
+      name: Map the IP Address and hostname
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_host }} master.puppet.dev"
+    -
+      name: Configure Puppet server information
+      blockinfile:
+        dest: /etc/puppetlabs/puppet/puppet.conf
+        block: |
+          # Pupper Server Configuration
+          [master]
+          dns_alt_names = master,master.puppet.dev
+
+          # Puppet Agent Configuration
+          [main]
+          certname = master.puppet.dev
+          server = master.puppet.dev
+          runinterval = 5m
+    -
+      name: Configure Auto sign
+      blockinfile:
+        dest: /etc/puppetlabs/puppet/autosign.conf
+        create: true
+        block: |
+          *.puppet.dev
+    -
+      name: Restart the Puppet Master service
+      service:
+        name: puppetserver
+        state: restarted
+-
+  name: Generate SSL certificate for Puppet Agent
+  hosts: master
+  tasks:
+    -
+      name: Generate SSL certificate
+      command: puppetserver ca setup
+    -
+      name: Start the Puppet Master service
+      service:
+        name: puppetserver
+        state: started
+    -
+      name: Enable Puppet master service
+      systemd:
+        name: puppetserver
+        enabled: yes
+- 
+  name: Configure firewall
+  hosts: master
+  tasks:
+    -
+      name: Install firewalld
+      yum:
+        name: firewalld
+        state: present
+    -
+      name: allow port 8140
+      firewalld:
+        port: 8140/tcp
+        permanent: yes
+        state: enabled
+    -
+      name: allow port ntp
+      firewalld:
+        service: ntp
+        permanent: yes
+        state: enabled
+-
+  name: Install Agent on standalone VM
+  hosts: agent
+  vars:
+    master_server: 192.168.1.31
+  tasks:
+    -
+      name: Configure NTP
+      lineinfile:
+        path: /etc/chrony.conf
+        line: "server {{ master_server }}"
+    -
+      name: Restart chrony service
+      service:
+        name: chronyd
+        state: restarted
+    - 
+      name: Install Puppet Agent
+      yum:
+        name: puppet-agent
+        state: present
+    -
+      name: Set the FQDN
+      command: hostnamectl set-hostname agent.puppet.dev
+    -
+      name: Map the IP Address and hostname for Puppet Agent
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_host }} agent.puppet.dev"
+    -
+      name: Map the IP Address and hostname for Puppet Master
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ master_server }} master.puppet.dev"
+    -
+      name: Start the Puppet Agent service
+      service:
+        name: puppet
+        state: started
+    -
+      name: Enable Puppet Agent service
+      systemd:
+        name: puppet
+        enabled: yes
+    -
+      name: Get Puppet version
+      command: puppet --version
+      register: puppet_version
+    -
+      name: Display Puppet version
+      debug:
+        msg: "Puppet version is {{ puppet_version.stdout_lines }}"
+    -
+      name: Configure Puppet Agent information
+      blockinfile:
+        dest: /etc/puppetlabs/puppet/puppet.conf
+        block: |
+          [main]
+          server = master.puppet.dev
+          certname = agent.puppet.dev
+          runinterval = 5m
+    -
+      name: Restart the Puppet service
+      service:
+        name: puppet
+        state: restarted
+    -
+      name: Ensure the Puppet Agent running on boot
+      command: puppet resource service puppet ensure=running enable=true
+    -
+      name: Test the Puppet configuration
+      command: puppet agent --test
+      ignore_errors: true
+-
+  name: Sign all certificate requests
+  hosts: master
+  tasks:
+    -
+      name: Sign all certificate requests
+      command: puppetserver ca sign --all
+-
+  name: Check the certificate status
+  hosts: agent
+  tasks:
+    -
+      name: Test the Puppet configuration
+      command: puppet agent --test
+      ignore_errors: true
+      register: puppet_test
+    -
+      name: Display the test result
+      debug:
+        var: puppet_test
