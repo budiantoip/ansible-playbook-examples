@@ -2,6 +2,15 @@
 # - https://www.itzgeek.com/post/how-to-install-puppet-on-centos-8-rhel-8/
 # - https://www.itzgeek.com/post/how-to-install-ntp-chrony-on-centos-8-centos-7-rhel-8-rhel-7/#configure-ntp-client-using-chrony
 
+# - 
+#   name: Display inventory vars
+#   hosts: all
+#   tasks:
+#     -
+#       name: Display vars
+#       debug:
+#         msg: "{{ hostvars['master']['ansible_facts']['enp0s3']['ipv4']['address'] | regex_search('(.*).[0-9]+$', '\\1') | first }}0/24"
+
 -
   name: Install Puppet repository
   hosts: all
@@ -28,7 +37,7 @@
       lineinfile:
         path: /etc/chrony.conf
         search_string: allow 192
-        line: allow 192.168.1.0/24
+        line: "allow {{ hostvars['master']['ansible_facts']['enp0s3']['ipv4']['address'] | regex_search('(.*).[0-9]+$', '\\1') | first }}0/24"
     -
       name: Restart chrony service
       service:
@@ -47,6 +56,7 @@
       name: Map the IP Address and hostname
       lineinfile:
         path: /etc/hosts
+        search_string: master.puppet.dev
         line: "{{ ansible_host }} master.puppet.dev"
     -
       name: Configure Puppet server information
@@ -115,14 +125,12 @@
 -
   name: Install Agent on standalone VM
   hosts: agent
-  vars:
-    master_server: 192.168.1.31
   tasks:
     -
       name: Configure NTP
       lineinfile:
         path: /etc/chrony.conf
-        line: "server {{ master_server }}"
+        line: "server {{ hostvars['master']['ansible_facts']['enp0s3']['ipv4']['address'] }}"
     -
       name: Restart chrony service
       service:
@@ -140,12 +148,14 @@
       name: Map the IP Address and hostname for Puppet Agent
       lineinfile:
         path: /etc/hosts
+        search_string: agent.puppet.dev
         line: "{{ ansible_host }} agent.puppet.dev"
     -
       name: Map the IP Address and hostname for Puppet Master
       lineinfile:
         path: /etc/hosts
-        line: "{{ master_server }} master.puppet.dev"
+        search_string: master.puppet.dev
+        line: "{{ hostvars['master']['ansible_facts']['enp0s3']['ipv4']['address'] }} master.puppet.dev"
     -
       name: Start the Puppet Agent service
       service:
